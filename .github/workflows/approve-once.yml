@@ -1,0 +1,19 @@
+name: approve-once
+# Approves a PR once, at open time, so the rig can test whether a later push
+# keeps the approval (dismiss_stale_reviews_on_push=false / require_last_push_approval=false).
+on:
+  pull_request:
+    types: [opened]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approve PR as github-actions[bot]
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: gh pr review "$PR" --repo "$REPO" --approve
