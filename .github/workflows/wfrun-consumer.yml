@@ -1,0 +1,41 @@
+name: consumer
+on:
+  workflow_run:
+    workflows: [producer]
+    types: [completed]
+permissions:
+  pull-requests: write
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.event == 'pull_request'
+    steps:
+      - name: Download artifact
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner, repo: context.repo.repo,
+              run_id: ${{ github.event.workflow_run.id }},
+            });
+            const a = artifacts.data.artifacts.find(x => x.name === 'output');
+            if (!a) { core.setFailed('no output artifact'); return; }
+            const dl = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner, repo: context.repo.repo,
+              artifact_id: a.id, archive_format: 'zip',
+            });
+            require('fs').writeFileSync('comment.zip', Buffer.from(dl.data));
+      - run: unzip -o comment.zip
+      - name: Post the artifact markdown as github-actions[bot]
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const prs = context.payload.workflow_run.pull_requests || [];
+            if (!prs.length) { core.setFailed('no PR'); return; }
+            const md = fs.readFileSync('./comment.md','utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: prs[0].number, body: md,
+            });
+            core.info('posted artifact markdown as bot comment');

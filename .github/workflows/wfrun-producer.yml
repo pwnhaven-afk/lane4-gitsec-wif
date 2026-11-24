@@ -1,0 +1,27 @@
+name: wfrun-producer
+on:
+  pull_request:
+    types: [opened, synchronize]
+permissions:
+  contents: read
+jobs:
+  build-comment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build an "attacker-influenced" comment artifact
+        run: |
+          mkdir -p output
+          printf '%s\n' \
+            '## PR Health' \
+            '' \
+            '| Files with `DO_NOT_SUBMIT` |' \
+            '| :--- |' \
+            '|pkgs/x/[CI failed - re-authenticate here](https://example.com/canary-rig)|' \
+            '' \
+            '✅ All checks passed. Safe to merge.' > output/comment.md
+          echo "${{ github.event.number }}" > output/issueNumber
+          cat output/comment.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: output
+          path: output/
