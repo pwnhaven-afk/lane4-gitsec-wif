@@ -1,0 +1,42 @@
+name: gitsec-wif-probe
+on:
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      PROVIDER: "projects/102295818544/locations/global/workloadIdentityPools/gitsec-gha-artifacts/providers/gitsec-gha-artifacts-provider"
+    steps:
+      - name: Mint GitHub OIDC token for the gitsec provider audience
+        run: |
+          set -uo pipefail
+          AUD="//iam.googleapis.com/${PROVIDER}"
+          echo "aud=$AUD"
+          RAW=$(curl -sS -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=$(python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=""))' "$AUD")")
+          TOKEN=$(printf '%s' "$RAW" | jq -r '.value // empty')
+          if [ -z "$TOKEN" ]; then echo "NO_TOKEN raw=$RAW"; exit 0; fi
+          echo "token_len=${#TOKEN}"
+          echo "CLAIMS:"
+          printf '%s' "$TOKEN" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq -c '{iss,aud,sub,repository,repository_id,repository_owner,repository_owner_id,ref,event_name}' || true
+          echo "GH_ID_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      - name: Attempt STS token exchange against the gitsec WIF provider
+        run: |
+          set -uo pipefail
+          BODY=$(python3 -c '
+import json,os
+print(json.dumps({
+ "audience":"//iam.googleapis.com/"+os.environ["PROVIDER"],
+ "grantType":"urn:ietf:params:oauth:grant-type:token-exchange",
+ "requestedTokenType":"urn:ietf:params:oauth:token-type:access_token",
+ "scope":"https://www.googleapis.com/auth/cloud-platform",
+ "subjectTokenType":"urn:ietf:params:oauth:token-type:jwt",
+ "subjectToken":os.environ["GH_ID_TOKEN"]}))')
+          echo "--- STS response ---"
+          curl -sS -w "\nHTTP_STATUS=%{http_code}\n" -X POST "https://sts.googleapis.com/v1/token" \
+            -H "Content-Type: application/json" -d "$BODY" | head -c 2000 || true
