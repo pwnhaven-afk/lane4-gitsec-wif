@@ -1,0 +1,27 @@
+name: bot-pr
+# Creates a PR authored by github-actions[bot] so a human (repo owner) can approve it,
+# then the rig pushes a new commit and checks whether the approval survives.
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  make-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Create bot branch and PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git checkout -b bot-owned-branch
+          echo "bot-authored content $(date -u +%H%M%S)" > BOT.md
+          git add BOT.md
+          git commit -m "bot: v1 content"
+          git push origin bot-owned-branch
+          gh pr create --repo "$REPO" --head bot-owned-branch --base main \
+            --title "bot-owned PR (stale-approval rig)" --body "Authored by github-actions[bot]; approve as a human, then push a commit."
