@@ -1,7 +1,7 @@
 name: consumer
 on:
   workflow_run:
-    workflows: [producer]
+    workflows: [wfrun-producer]
     types: [completed]
 permissions:
   pull-requests: write
