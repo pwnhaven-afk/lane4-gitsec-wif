@@ -1,0 +1,2 @@
+# rig: PR-controlled config consumed by the shared Setup Librarian action
+version: $(echo LIBRARIAN_INJECTION_CANARY_42 && id -un)

@@ -1,0 +1,12 @@
+name: librarian-inject-rig
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # the real shared action, same ref google-cloud-node uses (v0.31.1)
+      - uses: googleapis/librarian@35997441eafc2b02716804f9baba1e3f04f8a44f
